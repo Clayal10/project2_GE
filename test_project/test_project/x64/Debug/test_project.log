@@ -1,0 +1,50 @@
+﻿  helpers.cpp
+  Source.cpp
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(191,99): warning C4267: 'argument': conversion from 'size_t' to 'GLsizei', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(256,23): warning C4305: '+=': truncation from 'double' to 'T'
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(256,23): warning C4305:         with
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(256,23): warning C4305:         [
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(256,23): warning C4305:             T=float
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(256,23): warning C4305:         ]
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(260,23): warning C4305: '-=': truncation from 'double' to 'T'
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(260,23): warning C4305:         with
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(260,23): warning C4305:         [
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(260,23): warning C4305:             T=float
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(260,23): warning C4305:         ]
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(280,22): warning C4244: '+=': conversion from 'double' to 'T', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(280,22): warning C4244:         with
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(280,22): warning C4244:         [
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(280,22): warning C4244:             T=float
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(280,22): warning C4244:         ]
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(286,22): warning C4244: '-=': conversion from 'double' to 'T', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(286,22): warning C4244:         with
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(286,22): warning C4244:         [
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(286,22): warning C4244:             T=float
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(286,22): warning C4244:         ]
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(306,22): warning C4244: '+=': conversion from 'double' to 'T', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(306,22): warning C4244:         with
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(306,22): warning C4244:         [
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(306,22): warning C4244:             T=float
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(306,22): warning C4244:         ]
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(312,22): warning C4244: '-=': conversion from 'double' to 'T', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(312,22): warning C4244:         with
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(312,22): warning C4244:         [
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(312,22): warning C4244:             T=float
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(312,22): warning C4244:         ]
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(469,59): warning C4244: 'argument': conversion from 'double' to 'float', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(469,93): warning C4244: 'argument': conversion from 'double' to 'float', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(478,60): warning C4244: 'argument': conversion from 'double' to 'float', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(478,95): warning C4244: 'argument': conversion from 'double' to 'float', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(598,27): warning C4244: '-=': conversion from 'double' to 'float', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(599,29): warning C4244: '-=': conversion from 'double' to 'float', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(603,10): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(604,11): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(606,26): warning C4244: 'argument': conversion from 'float' to 'GLsizei', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(606,19): warning C4244: 'argument': conversion from 'float' to 'GLsizei', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(612,47): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(612,40): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+C:\Users\claya\Desktop\current_GE\test_project\test_project\Source.cpp(628,23): warning C4305: '=': truncation from 'double' to 'float'
+  stb_image.cpp
+  tiny_obj_loader.cc
+  Generating Code...
+  test_project.vcxproj -> C:\Users\claya\Desktop\current_GE\test_project\x64\Debug\test_project.exe
