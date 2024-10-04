@@ -420,7 +420,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if(GLFW_KEY_D == key)
 		player_key_status.right = action;
 	if(GLFW_KEY_SPACE == key && 1 == action){
-		if(player_platform){//only jump on platforms. Keep?
+		//if(player_platform){//only jump on platforms. Keep?
 			player_fall_speed = 0.65f;
 			player_position.y += 1;
 			/*
@@ -429,7 +429,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			}
 			*/
 			player_platform = 0;
-		}
+		//}
 	}
 }
 
@@ -442,39 +442,20 @@ void player_movement(){
 		glm::vec3 step_to_point = player_position;
 		float speed;
 		if(player_key_status.forward){
-			if (!player_platform) {
-				speed = 0.2f;
-			}
-			else {
-				speed = 0.6f;
-			}
+			speed = 0.6f;
 			step_to_point += speed * glm::vec3(sinf(player_heading), 0, cosf(player_heading));
 		}
 		if(player_key_status.backward){
-			if (!player_platform) {
-				speed = 0.2f;
-			}
-			else {
-				speed = 0.6f;
-			}
+			speed = 0.6f;
 			step_to_point += speed * glm::vec3(-sinf(player_heading), 0, -cosf(player_heading));
 		}
 		if(player_key_status.left){
-			if (!player_platform) {
-				speed = 0.2f;
-			}
-			else {
-				speed = 0.6f;
-			}
+			speed = 0.6f;
 			step_to_point += speed * glm::vec3(sinf(player_heading + M_PI/2), 0, cosf(player_heading + M_PI/2));
 		}
 		if(player_key_status.right){
-			if (!player_platform) {
-				speed = 0.2f;
-			}
-			else {
-				speed = 0.6f;
-			}
+
+			speed = 0.6f;
 			step_to_point += speed * glm::vec3(-sinf(player_heading + M_PI/2), 0, -cosf(player_heading + M_PI/2));
 		}
 		// TODO:  What about x and z?
