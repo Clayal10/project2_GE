@@ -45,6 +45,7 @@ float player_heading;
 float player_height = 6;
 float player_elevation;
 float player_fall_speed = 0;
+int time_resolution = 10;
 gameobject *player_platform = 0;
 size_t player_platform_index = 0;
 
@@ -53,6 +54,7 @@ GLuint make_shader(const char* filename, GLenum shaderType);
 
 class gameobject {
 	public:
+		bool collision_check = false;
 		std::vector<glm::vec3> locations;
 		glm::vec3 size; // What about non-square objects?
 		virtual int init() { return 0; }
@@ -125,6 +127,8 @@ class loaded_object : public gameobject {
 	public:
 		unsigned int mvp_uniform, anim_uniform, v_attrib, t_attrib, program, vbuf, cbuf, ebuf, tex, models_buffer;
 		const char *objectfile, *texturefile;
+		float scale = 1.0f;
+		bool swap_yz = false;
 		loaded_object(const char* of, const char* tf, glm::vec3 s) : objectfile(of), texturefile(tf) {
 			size = s;
 		}
@@ -134,7 +138,7 @@ class loaded_object : public gameobject {
 			std::vector<vertex> vertices;
 			std::vector<uint32_t> indices; // Consider unified terminology
 
-			load_model(vertices, indices, objectfile);
+			load_model(vertices, indices, objectfile, scale, swap_yz);
 
 			glGenBuffers(1, &vbuf);
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbuf);
@@ -243,6 +247,44 @@ class loaded_object : public gameobject {
 			puts("Ended collision normal without returning");
 			return glm::vec3(0, 0, 0);
 		}
+};
+class projectile : public loaded_object {
+public:
+	std::vector<glm::vec3> directions;
+	std::vector<float> lifetimes;
+	projectile() : loaded_object("projectile.obj", "projectile.jpg", glm::vec3(0.1, 0.1, 0.1)) {}
+	void move() {
+		for (int i = 0; i < locations.size(); i++) {
+			locations[i] += directions[i];
+			lifetimes[i] -= time_resolution; // TODO:  Manage time resolutions better
+			if (lifetimes[i] <= 0.0f) {
+				// TODO:  Delete projectile
+			}
+		}
+	}
+
+	void add_projectile(glm::vec3 location, glm::vec3 direction, float lifetime) {
+		locations.push_back(location);
+		directions.push_back(direction);
+		lifetimes.push_back(lifetime);
+	}
+	void add_projectile(glm::vec3 location, float heading, float elevation, float speed, float lifetime, float offset = 0.0f) {
+		glm::vec3 direction;
+		direction.x = cosf(elevation) * sinf(heading);
+		direction.y = sinf(elevation);
+		direction.z = cosf(elevation) * cosf(heading);
+		location += offset * direction;
+		direction *= speed;
+		add_projectile(location, direction, lifetime);
+	}
+};
+projectile bullets;
+class target : public loaded_object {
+public:
+	target() : loaded_object("cube.obj", "brick.jpg", glm::vec3(1.0f, 1.0f, 1.0f)) {
+		collision_check = true;
+	}
+
 };
 
 class elevator : public loaded_object {
@@ -402,6 +444,15 @@ struct key_status {
 };
 struct key_status player_key_status;
 
+void fire() {
+	bullets.add_projectile(player_position, player_heading, player_elevation, 0.25f, 10000.0f, 1.0f);
+}
+void mouse_click_callback(GLFWwindow* window, int button, int action, int mods) {
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		fire();
+	}
+}
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
 	if(GLFW_KEY_W == key && 1 == action){
 		player_key_status.forward = 1;
@@ -492,12 +543,12 @@ void player_movement(){
 			if(!player_platform->is_on_idx(player_position, player_platform_index))
 				player_platform = 0;
 			else {
-				/*
+/*
 				   glm::vec3 pltloc = player_platform->locations[player_platform_index];
 				   float floor_height = pltloc.y + (player_platform->size.y / 2);
 				   printf("On object, offset = %f\n", player_position.y - (floor_height + player_height));
 				   player_position.y = floor_height + player_height;
-				 */
+*/				 
 
 			}
 		} else {
@@ -603,6 +654,7 @@ int main(int argc, char** argv) {
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetCursorPosCallback(window, pos_callback);
 	glfwSetFramebufferSizeCallback(window, resize);
+	glfwSetMouseButtonCallback(window, mouse_click_callback);
 
 	/* Set starting point */
 	player_position = glm::vec3(50, 10, 50);
@@ -613,6 +665,14 @@ int main(int argc, char** argv) {
 
 	tile_floor fl;
 	objects.push_back(&fl);
+	objects.push_back(&bullets);
+
+	target targets;
+	targets.scale = 10.0f;
+	targets.swap_yz = true;
+	targets.locations.push_back(glm::vec3(-60, -5, 60));
+	objects.push_back(&targets);
+
 
 	//starting pad. eyes are at 0 (won't let it go lower) object collision is -10
 	loaded_object start("start_platform.obj", "brick.jpg", glm::vec3(30, 1, 30));//need to change the .obj
@@ -665,7 +725,17 @@ int main(int argc, char** argv) {
 	//paradise
 	loaded_object paradise("paradise.obj", "paradise.jpg", glm::vec3(20, 20, 20));
 	paradise.locations.push_back(glm::vec3(1000, 140, 100));
+	//paradise.locations.push_back(glm::vec3(50, 0, 100));//place holder for enemy to shoot at and kill
 	objects.push_back(&paradise);
+
+	/*Wall for testing*/
+	loaded_object wall_block("cube.obj", "brick.jpg", glm::vec3(2, 2, 2));
+	for (int x = 0; x < 20; x += 2) {
+		for (int y = -10; y < 20; y += 2) {
+			wall_block.locations.push_back(glm::vec3(x, y, 0));
+		}
+	}
+	objects.push_back(&wall_block);
 
 	/* Initialize game objects */
 	for(gameobject* o : objects){
