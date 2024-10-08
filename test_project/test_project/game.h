@@ -14,6 +14,6 @@ struct vertex {
 }; // __attribute__((packed)); // TODO:  Alignment
 
 unsigned int load_texture(const char* filename);
-int load_model(std::vector<vertex> &verticies, std::vector<uint32_t> &indices, const char* filename);
+int load_model(std::vector<vertex> &verticies, std::vector<uint32_t> &indices, const char* filename, float scale, bool swap_yz);
 
 #endif
