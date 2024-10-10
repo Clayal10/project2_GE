@@ -476,98 +476,6 @@ class elevator : public loaded_object {
 		}
 };
 
-class lightbox : public gameobject {
-	public:
-		unsigned int mvp_uniform, anim_uniform, v_attrib, c_attrib, program, vbuf, cbuf, ebuf;
-
-		int init() override {
-			// Initialization part
-			float vertices[] = {
-				// front
-				-1.0, -1.0,  1.0,
-				1.0, -1.0,  1.0,
-				1.0,  1.0,  1.0,
-				-1.0,  1.0,  1.0,
-				// back
-				-1.0, -1.0, -1.0,
-				1.0, -1.0, -1.0,
-				1.0,  1.0, -1.0,
-				-1.0,  1.0, -1.0,
-			};
-			glGenBuffers(1, &vbuf);
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbuf);
-			glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-			float colors[] = {
-				// front colors
-				1.0, 0.0, 1.0,
-				1.0, 0.5, 1.0,
-				1.0, 1.0, 1.0,
-				1.0, 1.0, 1.0,
-				// back colors
-				0.5, 1.0, 0.5,
-				0.5, 1.0, 0.5,
-				1.0, 1.0, 1.0,
-				1.0, 1.0, 1.0,
-			};
-			glGenBuffers(1, &cbuf);
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, cbuf);
-			glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
-
-			GLushort cube_elements[] = {
-				// front
-				0, 1, 2,
-				2, 3, 0,
-				// top
-				1, 5, 6,
-				6, 2, 1,
-				// back
-				7, 6, 5,
-				5, 4, 7,
-				// bottom
-				4, 0, 3,
-				3, 7, 4,
-				// left
-				4, 5, 1,
-				1, 0, 4,
-				// right
-				3, 2, 6,
-				6, 7, 3,
-			};
-			glGenBuffers(1, &ebuf);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebuf);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_elements), cube_elements, GL_STATIC_DRAW);
-
-			program = make_program("other_vertex_shader.glsl",0, 0, 0, "fragment_shader.glsl");
-			if (!program)
-				return 1;
-
-			v_attrib = glGetAttribLocation(program, "in_vertex");
-			c_attrib = glGetAttribLocation(program, "in_color");
-			mvp_uniform = glGetUniformLocation(program, "mvp");
-			return 0;
-		}
-		void draw(glm::mat4 vp) override {
-			glUseProgram(program);
-
-			glEnableVertexAttribArray(v_attrib);
-			glBindBuffer(GL_ARRAY_BUFFER, vbuf);
-			glVertexAttribPointer(v_attrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-			glEnableVertexAttribArray(c_attrib);
-			glBindBuffer(GL_ARRAY_BUFFER, cbuf);
-			glVertexAttribPointer(c_attrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-			int size;
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebuf);
-			glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-
-			glUniformMatrix4fv(mvp_uniform, 1, 0, glm::value_ptr(vp));
-
-			glDrawElementsInstanced(GL_TRIANGLES, size / sizeof(GLushort), GL_UNSIGNED_SHORT, 0, 1);
-		}
-};
-
 
 GLuint make_shader(const char* filename, GLenum shaderType) {
 	FILE* fd = fopen(filename, "r");
@@ -705,16 +613,16 @@ void player_movement(){
 		auto start = std::chrono::system_clock::now();
 		glm::vec3 step_to_point = player_position;
 		if(player_key_status.forward){
-			step_to_point += 0.1f * glm::vec3(sinf(player_heading), 0, cosf(player_heading));
+			step_to_point += 0.6f * glm::vec3(sinf(player_heading), 0, cosf(player_heading));
 		}
 		if(player_key_status.backward){
-			step_to_point += 0.1f * glm::vec3(-sinf(player_heading), 0, -cosf(player_heading));
+			step_to_point += 0.4f * glm::vec3(-sinf(player_heading), 0, -cosf(player_heading));
 		}
 		if(player_key_status.left){
-			step_to_point += 0.05f * glm::vec3(sinf(player_heading + M_PI/2), 0, cosf(player_heading + M_PI/2));
+			step_to_point += 0.6f * glm::vec3(sinf(player_heading + M_PI/2), 0, cosf(player_heading + M_PI/2));
 		}
 		if(player_key_status.right){
-			step_to_point += 0.05f * glm::vec3(-sinf(player_heading + M_PI/2), 0, -cosf(player_heading + M_PI/2));
+			step_to_point += 0.4f * glm::vec3(-sinf(player_heading + M_PI/2), 0, -cosf(player_heading + M_PI/2));
 		}
                 for(gameobject* o : objects) {
                         long collide_index = o->collision_index(step_to_point, 0.2f);
