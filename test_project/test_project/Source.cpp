@@ -1,10 +1,3 @@
-/*
-   Simplified OpenGL 4.5 demo
- * Seth Long, Fall 2020
- * This is a *very* short demo which displays a triangle
- * Many of these functions can fail, and return error values
- * I doubt it can be done much shorter without leaving vertices in only main memory or some such
- */
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -18,18 +11,19 @@
 #include<thread>
 #include<chrono>
 #include<mutex>
+#include<ctime>
 #include "scolor.hpp"
 #include "game.h"
 
 #define _USE_MATH_DEFINES
-#define GRAVITY 0.015f
-#define M_PI 3.14159265
+#define GRAVITY 0.0001f
+#define M_PI 3.14159265f
 
 std::mutex grand_mutex;
 class gameobject;
 
-float height = 800;
-float width = 1280;
+float height = 1550;
+float width = 2600;
 
 // Will be used for a lot of stuff throughout the demo
 // NOTE:  general_buffer is NOT thread safe.  Don't try to load shaders in parallel!
@@ -38,16 +32,17 @@ float width = 1280;
 /* Global section */
 char* general_buffer;
 int framecount = 0;
+int time_resolution = 10;
 
 /* Player globals */
 glm::vec3 player_position;
 float player_heading;
-float player_height = 6;
+float player_height = 2;
 float player_elevation;
 float player_fall_speed = 0;
-int time_resolution = 10;
 gameobject *player_platform = 0;
 size_t player_platform_index = 0;
+	
 
 GLuint make_program(const char* v_file, const char* tcs_file, const char* tes_file, const char* g_file, const char* f_file);
 GLuint make_shader(const char* filename, GLenum shaderType);
@@ -69,6 +64,33 @@ class gameobject {
 		}
 		virtual glm::vec3 collision_normal(glm::vec3 move_to, glm::vec3 old_position, long index, float distance = 0) {
 			return glm::vec3(0, 0, 0);
+		}
+		virtual bool collision_with_index(glm::vec3 position, size_t index, float distance = 0) { return false; }//GO BACK TO THIS
+		virtual void hit_index(long index) {}
+};
+
+class activation_area : public gameobject {
+	public:
+		std::vector<void (*)()> callbacks;
+		activation_area() {
+			collision_check = false;
+		}
+		void add_area(glm::vec3 location, void (*callback_function)()){
+			locations.push_back(location);
+			callbacks.push_back(callback_function);
+		}
+		long collision_index(glm::vec3 position, float distance = 0){
+			for(long i = 0; i < locations.size(); i++){
+				glm::vec3 l = locations[i]; // This'll get optimized out
+				// TODO:  Collision Bounds
+				if(	size.x/2.0f + distance > abs(l.x-position.x) && 
+						size.y/2.0f + distance > abs(l.y-position.y) && 
+						size.z/2.0f + distance > abs(l.z-position.z)){
+					callbacks[i]();
+					return i;
+				}
+			}
+			return -1;
 		}
 };
 
@@ -131,6 +153,7 @@ class loaded_object : public gameobject {
 		bool swap_yz = false;
 		loaded_object(const char* of, const char* tf, glm::vec3 s) : objectfile(of), texturefile(tf) {
 			size = s;
+			collision_check = true;
 		}
 
 		int init() override {
@@ -221,7 +244,6 @@ class loaded_object : public gameobject {
 		}
 
 		/* Leaving y for later, so we finish today */
-
 		glm::vec3 collision_normal(glm::vec3 move_to, glm::vec3 old_position, long index, float distance = 0){
 			glm::vec3 l = locations[index]; // This'll get optimized out
 			if(	old_position.z > l.z + (size.z/2 + distance) &&
@@ -245,46 +267,191 @@ class loaded_object : public gameobject {
 				return glm::vec3(-1, 0, 0);
 			}
 			puts("Ended collision normal without returning");
-			return glm::vec3(0, 0, 0);
 		}
+
+		bool collision_with_index(glm::vec3 position, size_t index, float distance = 0){
+                        glm::vec3 l = locations[index]; // This'll get optimized out
+                        if(     size.x/2.0f + distance > abs(l.x-position.x) &&
+                                size.y/2.0f + distance > abs(l.y-position.y) &&
+                                size.z/2.0f + distance > abs(l.z-position.z)){
+                                return true;
+                        }
+                        return false;
+
+                }
+
 };
+
+float randvel(float speed){
+	long min = -100;
+	long max = 100;
+	return speed * (min + rand() % (max + 1 - min));
+}
+/* Projectiles have:
+ * 	speed
+ * 	direction
+ * 	lifespan
+ */
 class projectile : public loaded_object {
 public:
 	std::vector<glm::vec3> directions;
 	std::vector<float> lifetimes;
-	projectile() : loaded_object("projectile.obj", "projectile.jpg", glm::vec3(0.1, 0.1, 0.1)) {}
-	void move() {
-		for (int i = 0; i < locations.size(); i++) {
-			locations[i] += directions[i];
-			lifetimes[i] -= time_resolution; // TODO:  Manage time resolutions better
-			if (lifetimes[i] <= 0.0f) {
-				// TODO:  Delete projectile
-			}
+	std::vector<bool> bursting;
+	std::mutex data_mutex;
+	projectile() : loaded_object("projectile.obj", "projectile.jpg", glm::vec3(0.1, 0.1, 0.1)) {
+		collision_check = false;
+	}
+	void create_burst(float quantity, glm::vec3 origin, float speed){
+		for(size_t i = 0; i < quantity; i++){
+			locations.push_back(origin);
+			lifetimes.push_back(10000.0f);
+			// One note:  This does create a cube of projectiles
+			directions.push_back(glm::vec3(randvel(speed), randvel(speed), randvel(speed)));
+			bursting.push_back(false);
 		}
 	}
-
-	void add_projectile(glm::vec3 location, glm::vec3 direction, float lifetime) {
+	void move() {
+		data_mutex.lock();
+		for(int i = 0; i < locations.size(); i++){
+			if(bursting[i])
+				directions[i].y -= 0.0002;
+			locations[i] += directions[i];
+			lifetimes[i] -= time_resolution; // TODO:  Manage time resolutions better
+			if(lifetimes[i] <= 0.0f) {
+				if(bursting[i])
+					create_burst(200, locations[i], 0.003);
+				remove_projectile(i);
+			}
+		}
+		data_mutex.unlock();
+	}
+	void remove_projectile(size_t index){
+		locations.erase(locations.begin() + index);
+		directions.erase(directions.begin() + index);
+		lifetimes.erase(lifetimes.begin() + index);
+		bursting.erase(bursting.begin() + index);
+	}
+	
+	void add_projectile(glm::vec3 location, glm::vec3 direction, float lifetime, bool burst = false){
+		data_mutex.lock();
 		locations.push_back(location);
 		directions.push_back(direction);
 		lifetimes.push_back(lifetime);
+		bursting.push_back(burst);
+		data_mutex.unlock();
 	}
-	void add_projectile(glm::vec3 location, float heading, float elevation, float speed, float lifetime, float offset = 0.0f) {
+	void add_projectile(glm::vec3 location, float heading, float elevation, float speed, float lifetime, float offset = 0.0f, bool burst = false){
 		glm::vec3 direction;
 		direction.x = cosf(elevation) * sinf(heading);
 		direction.y = sinf(elevation);
 		direction.z = cosf(elevation) * cosf(heading);
 		location += offset * direction;
+		if(!burst)
+			speed *= 2;
 		direction *= speed;
-		add_projectile(location, direction, lifetime);
+		add_projectile(location, direction, lifetime, burst);
+	}
+	void hit_index(size_t idx){
+		directions[idx] = glm::vec3(0, 0, 0);
+// 		directions[idx] = -directions[idx];
 	}
 };
-projectile bullets;
-class target : public loaded_object {
+projectile ice_balls;
+
+class fragment : public loaded_object {
 public:
-	target() : loaded_object("cube.obj", "brick.jpg", glm::vec3(1.0f, 1.0f, 1.0f)) {
-		collision_check = true;
+	std::vector<float> life_counts;
+	std::vector<glm::vec3> trajectories;
+	fragment() : loaded_object("projectile.obj", "brick.jpg", glm::vec3(1.0f, 1.0f, 1.0f)){
+		collision_check = false;
+	}
+	
+	void create_burst(float quantity, glm::vec3 origin, float speed){
+		for(size_t i = 0; i < quantity; i++){
+			locations.push_back(origin);
+			life_counts.push_back(1000.0f);
+			// One note:  This does create a cube of projectiles
+			trajectories.push_back(glm::vec3(randvel(speed), randvel(speed), randvel(speed)));
+		}
 	}
 
+	void move() {
+		for(size_t i = 0; i < locations.size(); i++){
+			life_counts[i] -= 0.1f;
+			locations[i] += trajectories[i];
+			// Is it on the ground?
+			// Import player fall code to make this more elaborate and probably buggy
+			if(locations[i].y <= -9.0){
+				trajectories[i].y = fabs(trajectories[i].y);
+
+				if(fabs(trajectories[i].x) < 0.02)
+					trajectories[i].x = 0.0f;
+				else 
+					trajectories[i].x *= 0.95f;
+
+				if(trajectories[i].y < 0.2)
+					trajectories[i].y = 0.0f;
+				else
+					trajectories[i].y *= 0.8f;
+
+				if(fabs(trajectories[i].z) < 0.02)
+					trajectories[i].z = 0.0f;
+				else
+					trajectories[i].z *= 0.95f;
+
+			} else { 
+				trajectories[i].y -= 0.1;
+			}
+		}
+	}
+		void draw(glm::mat4 vp) override {
+			glUseProgram(program);
+			std::vector<glm::mat4> models;
+			models.reserve(locations.size());
+			for(size_t i = 0; i < locations.size(); i++){
+				glm::mat4 new_model = glm::mat4(1.0f);
+				new_model = translate(new_model, locations[i]);
+				if(fabs(trajectories[i].x) > 0.0f || fabs(trajectories[i].z) > 0.0f)
+					new_model = rotate(new_model, life_counts[i], glm::vec3(-trajectories[i].z, 0, trajectories[i].x));
+				models.push_back(new_model);
+			}
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, models_buffer);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, models.size() * sizeof(glm::mat4), models.data(), GL_STATIC_DRAW);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, models_buffer);
+
+			glEnableVertexAttribArray(v_attrib);
+			glBindBuffer(GL_ARRAY_BUFFER, vbuf);
+			glVertexAttribPointer(v_attrib, 3, GL_FLOAT, GL_FALSE, 20, 0);
+
+			glEnableVertexAttribArray(t_attrib);
+			glVertexAttribPointer(t_attrib, 2, GL_FLOAT, GL_FALSE, 20, (const void*)12);
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, tex);
+
+			int size;
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebuf);
+			glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+
+			glUniformMatrix4fv(mvp_uniform, 1, 0, glm::value_ptr(vp));
+
+			glDrawElementsInstanced(GL_TRIANGLES, size / sizeof(GLuint), GL_UNSIGNED_INT, 0, locations.size());
+		}
+	
+};
+
+fragment brick_fragments;
+class target : public loaded_object {
+public:
+	target() : loaded_object("monkey.obj", "brick.jpg", glm::vec3(15.0f, 10.0f, 15.0f)) {
+		collision_check = true;
+	}
+	void hit_index(long index){
+		// Make fragments
+		brick_fragments.create_burst(100, locations[index], 0.01f);
+		locations.erase(locations.begin() + index);
+	}
+	
 };
 
 class elevator : public loaded_object {
@@ -296,11 +463,11 @@ class elevator : public loaded_object {
 			// Just one elevator for now
 			if(up) {
 				locations[0].y += .1;
-				if(locations[0].y > 150)
+				if(locations[0].y > 100)
 					up = false;
 			} else {
 				locations[0].y -= .1;
-				if(locations[0].y <= 80)
+				if(locations[0].y <= 0)
 					up = true;
 			}
 		}
@@ -309,60 +476,98 @@ class elevator : public loaded_object {
 		}
 };
 
-class slider : public loaded_object {
-public:
-	bool left = true;//if not left, then right
-	//double movement = 0;
-	double speed = .3f;
+class lightbox : public gameobject {
+	public:
+		unsigned int mvp_uniform, anim_uniform, v_attrib, c_attrib, program, vbuf, cbuf, ebuf;
 
-	slider(const char* of, const char* tf, glm::vec3 s) : loaded_object(of, tf, s) {}
-	void move() {
-		// Just one elevator for now
-		if (left) {
-			locations[0].z += speed;
-			//movement += speed;
-			if (locations[0].z > 75)
-				left = false;
+		int init() override {
+			// Initialization part
+			float vertices[] = {
+				// front
+				-1.0, -1.0,  1.0,
+				1.0, -1.0,  1.0,
+				1.0,  1.0,  1.0,
+				-1.0,  1.0,  1.0,
+				// back
+				-1.0, -1.0, -1.0,
+				1.0, -1.0, -1.0,
+				1.0,  1.0, -1.0,
+				-1.0,  1.0, -1.0,
+			};
+			glGenBuffers(1, &vbuf);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbuf);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+			float colors[] = {
+				// front colors
+				1.0, 0.0, 1.0,
+				1.0, 0.5, 1.0,
+				1.0, 1.0, 1.0,
+				1.0, 1.0, 1.0,
+				// back colors
+				0.5, 1.0, 0.5,
+				0.5, 1.0, 0.5,
+				1.0, 1.0, 1.0,
+				1.0, 1.0, 1.0,
+			};
+			glGenBuffers(1, &cbuf);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, cbuf);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+
+			GLushort cube_elements[] = {
+				// front
+				0, 1, 2,
+				2, 3, 0,
+				// top
+				1, 5, 6,
+				6, 2, 1,
+				// back
+				7, 6, 5,
+				5, 4, 7,
+				// bottom
+				4, 0, 3,
+				3, 7, 4,
+				// left
+				4, 5, 1,
+				1, 0, 4,
+				// right
+				3, 2, 6,
+				6, 7, 3,
+			};
+			glGenBuffers(1, &ebuf);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebuf);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_elements), cube_elements, GL_STATIC_DRAW);
+
+			program = make_program("other_vertex_shader.glsl",0, 0, 0, "fragment_shader.glsl");
+			if (!program)
+				return 1;
+
+			v_attrib = glGetAttribLocation(program, "in_vertex");
+			c_attrib = glGetAttribLocation(program, "in_color");
+			mvp_uniform = glGetUniformLocation(program, "mvp");
+			return 0;
 		}
-		else {
-			locations[0].z -= speed;
-			//movement -= speed;
-			if (locations[0].z <= 25)
-				left = true;
+		void draw(glm::mat4 vp) override {
+			glUseProgram(program);
+
+			glEnableVertexAttribArray(v_attrib);
+			glBindBuffer(GL_ARRAY_BUFFER, vbuf);
+			glVertexAttribPointer(v_attrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+			glEnableVertexAttribArray(c_attrib);
+			glBindBuffer(GL_ARRAY_BUFFER, cbuf);
+			glVertexAttribPointer(c_attrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+			int size;
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebuf);
+			glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+
+			glUniformMatrix4fv(mvp_uniform, 1, 0, glm::value_ptr(vp));
+
+			glDrawElementsInstanced(GL_TRIANGLES, size / sizeof(GLushort), GL_UNSIGNED_SHORT, 0, 1);
 		}
-	}
-	void draw(glm::mat4 vp) {
-		loaded_object::draw(vp);
-	}
 };
 
-class to_paradise : public loaded_object {
-public:
-
-	double speed = .6f;
-	bool to = true;
-
-	to_paradise(const char* of, const char* tf, glm::vec3 s) : loaded_object(of, tf, s) {}
-	void move() {
-		if (to) {
-			locations[0].x += speed;
-			if (locations[0].x >= 1000) {
-				to = false;
-			}
-		}
-		else {
-			locations[0].x -= speed;
-			if (locations[0].x <= 235) {
-				to = true;
-			}
-		}
-
-
-	}
-	void draw(glm::mat4 vp) {
-		loaded_object::draw(vp);
-	}
-};
 
 GLuint make_shader(const char* filename, GLenum shaderType) {
 	FILE* fd = fopen(filename, "r");
@@ -444,13 +649,15 @@ struct key_status {
 };
 struct key_status player_key_status;
 
-void fire() {
-	bullets.add_projectile(player_position, player_heading, player_elevation, 0.25f, 10000.0f, 1.0f);
+void fire(bool burst = false){
+	ice_balls.add_projectile(player_position, player_heading, player_elevation, 0.3f, 10000.0f, 1.0f, burst);
 }
-void mouse_click_callback(GLFWwindow* window, int button, int action, int mods) {
-	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-		fire();
-	}
+
+void mouse_click_callback(GLFWwindow* window, int button, int action, int mods){
+	if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+		fire();//non burst
+	if(button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+		fire(true);//burst
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
@@ -471,99 +678,80 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if(GLFW_KEY_D == key)
 		player_key_status.right = action;
 	if(GLFW_KEY_SPACE == key && 1 == action){
-		//if(player_platform){//only jump on platforms. Keep?
-			player_fall_speed = 0.65f;
-			player_position.y += 1;
-			/*
-			while (player_fall_speed < GRAVITY) {
-				player_fall_speed += .001f;
-			}
-			*/
+		if(player_platform){
+			player_fall_speed = 0.04f;
+			player_position.y += 1.0f;
 			player_platform = 0;
-		//}
+		}
 	}
+}
+
+
+long is_empty(glm::vec3 position, float distance){
+        for(gameobject* o : objects) {
+                long collide_index = o->collision_index(position, 0.2f);
+                if(collide_index != -1)
+                        return false;
+        }
+        return true;
+
 }
 
 int shutdown_engine = 0;
 /* Must be called at a consistent rate */
 void player_movement(){
 	while(!shutdown_engine){
-		grand_mutex.lock();
+//		grand_mutex.lock();
 		auto start = std::chrono::system_clock::now();
 		glm::vec3 step_to_point = player_position;
-		float speed;
 		if(player_key_status.forward){
-			speed = 0.6f;
-			step_to_point += speed * glm::vec3(sinf(player_heading), 0, cosf(player_heading));
+			step_to_point += 0.1f * glm::vec3(sinf(player_heading), 0, cosf(player_heading));
 		}
 		if(player_key_status.backward){
-			speed = 0.6f;
-			step_to_point += speed * glm::vec3(-sinf(player_heading), 0, -cosf(player_heading));
+			step_to_point += 0.1f * glm::vec3(-sinf(player_heading), 0, -cosf(player_heading));
 		}
 		if(player_key_status.left){
-			speed = 0.6f;
-			step_to_point += speed * glm::vec3(sinf(player_heading + M_PI/2), 0, cosf(player_heading + M_PI/2));
+			step_to_point += 0.05f * glm::vec3(sinf(player_heading + M_PI/2), 0, cosf(player_heading + M_PI/2));
 		}
 		if(player_key_status.right){
+			step_to_point += 0.05f * glm::vec3(-sinf(player_heading + M_PI/2), 0, -cosf(player_heading + M_PI/2));
+		}
+                for(gameobject* o : objects) {
+                        long collide_index = o->collision_index(step_to_point, 0.2f);
+                        if(collide_index != -1) {
+                                if(is_empty(glm::vec3(player_position.x, step_to_point.y, step_to_point.z), 0.2f)) {
+                                        step_to_point.x = player_position.x;
+                                        break;
+                                }
+                                else if(is_empty(glm::vec3(step_to_point.x, step_to_point.y, player_position.z), 0.2f)) {
+                                        step_to_point.z = player_position.z;
+                                        break;
+                                }
+                                else {
+                                        step_to_point = player_position;
+                                        break;
+                                }
 
-			speed = 0.6f;
-			step_to_point += speed * glm::vec3(-sinf(player_heading + M_PI/2), 0, -cosf(player_heading + M_PI/2));
-		}
-		// TODO:  What about x and z?
-		/*
-		 * if we're touching a wall:
-		 * 	Note what directions our movement is blocked in
-		 * 	Big question:  Can we have walls that don't align with an axis?
-		 * 	At first:  NO
-		 * 	Later:  Yes
-		 */
-		glm::vec3 block_direction(0, 0, 0);
-		for(gameobject* o : objects) {
-			long collide_index = o->collision_index(player_position, 4.0f);
-			if(collide_index != -1) {
-				block_direction = o->collision_normal(step_to_point, player_position, collide_index, 4.0f);
-			}
-		}
-		if(block_direction.x <= 0.0f && player_position.x < step_to_point.x)
-			player_position.x = step_to_point.x;
-		else if(block_direction.x >= 0.0f && player_position.x > step_to_point.x)
-			player_position.x = step_to_point.x;
-		if(block_direction.z <= 0.0f && player_position.z < step_to_point.z)
-			player_position.z = step_to_point.z;
-		else if(block_direction.z >= 0.0f && player_position.z > step_to_point.z)
-			player_position.z = step_to_point.z;
-		
-/*
-		if(block_direction.x != 0.0f || block_direction.z != 0.0f){
-			xblock = 0.0f;
-			zblock = 0.0f;
-		}
-*/
+
+                        }
+                }
+                player_position = step_to_point;
+
 		if(player_platform){
 			if(!player_platform->is_on_idx(player_position, player_platform_index))
 				player_platform = 0;
-			else {
-/*
-				   glm::vec3 pltloc = player_platform->locations[player_platform_index];
-				   float floor_height = pltloc.y + (player_platform->size.y / 2);
-				   printf("On object, offset = %f\n", player_position.y - (floor_height + player_height));
-				   player_position.y = floor_height + player_height;
-*/				 
-
-			}
 		} else {
-			float floor_height = -10;
+			float floor_height = 0;
 			for(gameobject* o : objects) {
 				long ppi = o->is_on(player_position);
 				if(ppi != -1) {
 					player_platform_index = ppi;
 					player_platform = o;	
-					floor_height = (player_platform->locations[player_platform_index].y) + (player_platform->size.y / 2);
+					floor_height = player_platform->locations[player_platform_index].y + (player_platform->size.y / 2);
 					player_fall_speed = 0;
-					player_position.y = floor_height;
+					player_position.y = floor_height + player_height; 
 				}
 			}
-			//gravity is always a factor here
 			if(player_position.y - player_height > floor_height) {
 				player_position.y += player_fall_speed;
 				player_fall_speed -= GRAVITY;
@@ -572,7 +760,7 @@ void player_movement(){
 				player_position.y = floor_height + player_height; 
 			}
 		}
-		grand_mutex.unlock();
+//		grand_mutex.unlock();
 		auto end = std::chrono::system_clock::now();
 		//		double difference = std::chrono::duration_cast<std::chrono::milliseconds>(start - end).count();
 		//		printf("Time difference:  %lf\n", difference);
@@ -583,19 +771,19 @@ void player_movement(){
 void object_movement(){
 	while(!shutdown_engine){
 		auto start = std::chrono::system_clock::now();
-		grand_mutex.lock();
+//		grand_mutex.lock();
 		if(player_platform){
 			glm::vec3 pltloc = player_platform->locations[player_platform_index];
 			float floor_height = pltloc.y + (player_platform->size.y / 2);
 			player_position.y = floor_height + player_height;
 		}
-		grand_mutex.unlock();
+//		grand_mutex.unlock();
 		for(gameobject* o : objects)
 			o->move();
 		auto end = std::chrono::system_clock::now();
 		//		double difference = std::chrono::duration_cast<std::chrono::milliseconds>(start - end).count();
 		//		printf("Time difference:  %lf\n", difference);
-		std::this_thread::sleep_for(std::chrono::microseconds(10000) - (start - end));
+		std::this_thread::sleep_for(std::chrono::microseconds(1000) - (start - end));
 	}
 }
 
@@ -614,11 +802,24 @@ void animation(){
 void collision_detection(){
 	while(!shutdown_engine){
 		auto start = std::chrono::system_clock::now();
-		// TODO:  Do this  (is it n^2?)
+		ice_balls.data_mutex.lock();
+		for(size_t proj_index = 0; proj_index < ice_balls.locations.size(); proj_index++){
+			glm::vec3 l = ice_balls.locations[proj_index];
+			for(auto o : objects){
+				if(o->collision_check){
+					long index = o->collision_index(l);
+					if(index != -1) {
+						o->hit_index(index);
+						ice_balls.hit_index(proj_index);
+					}
+				}
+			}
+		}	
+		ice_balls.data_mutex.unlock();
 		auto end = std::chrono::system_clock::now();
 		//		double difference = std::chrono::duration_cast<std::chrono::milliseconds>(start - end).count();
 		//		printf("Time difference:  %lf\n", difference);
-		std::this_thread::sleep_for(std::chrono::microseconds(10000) - (start - end));
+		std::this_thread::sleep_for(std::chrono::microseconds(1000) - (start - end));
 	}
 }
 void pos_callback(GLFWwindow* window, double xpos, double ypos){
@@ -638,11 +839,22 @@ void resize(GLFWwindow*, int new_width, int new_height){
 	glViewport(0, 0, width, height);
 }
 
+
+target targets;
+void bob(){
+	static bool bob_happened = false;
+	if(!bob_happened){
+		bob_happened = true;
+		targets.locations.push_back(glm::vec3(-10, 5, 10));
+	}
+};
+
 int main(int argc, char** argv) {
+	srand((unsigned int)time(0));
+
 	general_buffer = (char*)malloc(GBLEN);
 	glfwInit();
 	GLFWwindow* window = glfwCreateWindow(width, height, "Simple OpenGL 4.0+ Demo", 0, 0);
-	//resize(window, 1000, 800);
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwMakeContextCurrent(window);
 	glewInit();
@@ -657,85 +869,38 @@ int main(int argc, char** argv) {
 	glfwSetMouseButtonCallback(window, mouse_click_callback);
 
 	/* Set starting point */
-	player_position = glm::vec3(50, 10, 50);
-	player_heading = M_PI/2.0f;
+	player_position = glm::vec3(53, 10, 50);
+	player_heading = M_PI;
 
 
 	/* Level Loading (hardcoded at the moment) */
-
 	tile_floor fl;
+	objects.push_back(&ice_balls);
 	objects.push_back(&fl);
-	objects.push_back(&bullets);
 
-	target targets;
+
 	targets.scale = 10.0f;
-	targets.swap_yz = true;
-	targets.locations.push_back(glm::vec3(-60, -5, 60));
+	for(int height = 30; height < 300; height+= 30){
+		targets.locations.push_back(glm::vec3(0, height, 0));
+		targets.locations.push_back(glm::vec3(30, height, 0));
+		targets.locations.push_back(glm::vec3(-30, height, 0));
+	}
+	for(int z = -40; z > -300; z += -10)
+		targets.locations.push_back(glm::vec3(10, 3, z));
 	objects.push_back(&targets);
+	objects.push_back(&brick_fragments);
 
+	loaded_object wallblock("cube.obj", "brick.jpg", glm::vec3(2, 2, 2));
+	objects.push_back(&wallblock);
+	for(int x = 0; x < 20; x += 2)
+		for(int y = -10; y < 10; y += 2)
+			for(int z = 0; z < 4; z += 2)
+				wallblock.locations.push_back(glm::vec3(x, y, z));
 
-	//starting pad. eyes are at 0 (won't let it go lower) object collision is -10
-	loaded_object start("start_platform.obj", "brick.jpg", glm::vec3(30, 1, 30));//need to change the .obj
-	start.locations.push_back(glm::vec3(50, -10, 50));
-	objects.push_back(&start);
-	
-	//just a line of platforms
-	loaded_object basic_pad("platform.obj", "brick.jpg", glm::vec3(8, 2, 8));
-	int x, y, z;
-	for (int i = 0; i < 100; i += 10) {
-		
-		x = 75 + (i-(i/5));
-		y = i;
-		z = 50;
-
-		basic_pad.locations.push_back(glm::vec3(x, y, z));
-	}//the last platform is at (147, 90, 50)
-	objects.push_back(&basic_pad);
-
-	//sideways moving objects
-	slider slider_left("sliding_platform.obj", "ice.jpg", glm::vec3(16, 2, 16));
-	slider_left.locations.push_back(glm::vec3(159, 90, 50));
-	objects.push_back(&slider_left);
-	
-	slider slider_right("sliding_platform.obj", "ice.jpg", glm::vec3(16, 2, 16));
-	slider_right.locations.push_back(glm::vec3(175, 90, 50));
-	slider_right.left = false;
-	objects.push_back(&slider_right);
-	
-	//just a walkway before elevator
-	loaded_object static_platforms("platform.obj", "brick.jpg", glm::vec3(8, 2, 8));
-	for (int x = 187; x <= 227; x += 8) {
-		static_platforms.locations.push_back(glm::vec3(x, 90, 50));
-	}
-	for (int z = 58; z <= 98; z += 8) {
-		static_platforms.locations.push_back(glm::vec3(235, 150, z));//go off to the right
-	}
-	objects.push_back(&static_platforms);
-
-	//elevator takes you up to (227, 150, 50)
-	elevator e("platform.obj", "brick.jpg", glm::vec3(8, 2, 8));
-	e.locations.push_back(glm::vec3(235, 80, 50));
-	objects.push_back(&e);
-
-	//perhaps a guide to take you to paradise
-	to_paradise tp("platform.obj", "beans.jpg", glm::vec3(8, 2, 8));
-	tp.locations.push_back(glm::vec3(235, 150, 98));
-	objects.push_back(&tp);
-	
-	//paradise
-	loaded_object paradise("paradise.obj", "paradise.jpg", glm::vec3(20, 20, 20));
-	paradise.locations.push_back(glm::vec3(1000, 140, 100));
-	//paradise.locations.push_back(glm::vec3(50, 0, 100));//place holder for enemy to shoot at and kill
-	objects.push_back(&paradise);
-
-	/*Wall for testing*/
-	loaded_object wall_block("cube.obj", "brick.jpg", glm::vec3(2, 2, 2));
-	for (int x = 0; x < 20; x += 2) {
-		for (int y = -10; y < 20; y += 2) {
-			wall_block.locations.push_back(glm::vec3(x, y, 0));
-		}
-	}
-	objects.push_back(&wall_block);
+	activation_area target_spawning;
+	target_spawning.size = glm::vec3(10, 10, 10);
+	target_spawning.add_area(glm::vec3(10, 0, 10), bob);
+	objects.push_back(&target_spawning);
 
 	/* Initialize game objects */
 	for(gameobject* o : objects){
@@ -759,7 +924,7 @@ int main(int argc, char** argv) {
 		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		grand_mutex.lock();
+//		grand_mutex.lock();
 
 		glm::vec3 axis_y(0, 1, 0);
 		/* Where are we?  A:  player_position
@@ -775,7 +940,7 @@ int main(int argc, char** argv) {
 
 		for(gameobject* o : objects)
 			o->draw(vp);
-		grand_mutex.unlock();
+//		grand_mutex.unlock();
 
 		glfwSwapBuffers(window);
 	}
