@@ -481,4 +481,15 @@ class elevator : public loaded_object {
 		}
 };
 
+class turret : public loaded_object {
+	gameobject* current_target; //could make a list
+	projectile* current_projectile;
+
+	turret() : loaded_object("", "", glm::vec3()) {}
+
+	void move() {
+		
+	}
+};
+
 #endif

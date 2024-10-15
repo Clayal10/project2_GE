@@ -28,10 +28,6 @@
 
 std::mutex grand_mutex;
 
-
-
-	
-
 GLuint make_shader(const char* filename, GLenum shaderType) {
 	FILE* fd = fopen(filename, "r");
 	if (fd == 0) {
@@ -371,10 +367,12 @@ int main(int argc, char** argv) {
 	tex_cube.locations.push_back(glm::vec3(0, 0, 0));
 	objects.push_back(&tex_cube);
 
+	/*
 	activation_area target_spawning;
 	target_spawning.size = glm::vec3(10, 10, 10);
 	target_spawning.add_area(glm::vec3(10, 0, 10), bob);
 	objects.push_back(&target_spawning);
+	*/
 
 	/* Initialize game objects */
 	for(gameobject* o : objects){
