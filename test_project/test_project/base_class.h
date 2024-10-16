@@ -14,6 +14,7 @@
 #include<chrono>
 #include<mutex>
 #include<ctime>
+
 #include "scolor.hpp"
 #include "game.h"
 
@@ -101,7 +102,7 @@ class activation_area : public gameobject {
 
 class tile_floor : public gameobject {
 	public:
-		unsigned int mvp_uniform, anim_uniform, v_attrib, c_attrib, program, vbuf, cbuf, ebuf;
+		unsigned int mvp_uniform, anim_uniform, v_attrib, c_attrib, program, vbuf, cbuf, ebuf, tex;
 		int init() override {
 			// Initialization part
 			float vertices[] = {
@@ -122,12 +123,14 @@ class tile_floor : public gameobject {
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebuf);
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(floor_elements), floor_elements, GL_STATIC_DRAW);
 
+			tex = load_texture("stone_floor.jpg");
+
 			program = make_program("floor_vertex_shader.glsl",0, 0, 0, "floor_fragment_shader.glsl");
 			if (!program)
 				return 1;
 
 			v_attrib = glGetAttribLocation(program, "in_vertex");
-			c_attrib = glGetAttribLocation(program, "in_color");
+			//c_attrib = glGetAttribLocation(program, "in_color");
 			mvp_uniform = glGetUniformLocation(program, "mvp");
 			return 0;
 		}
@@ -138,6 +141,9 @@ class tile_floor : public gameobject {
 			glBindBuffer(GL_ARRAY_BUFFER, vbuf);
 			glVertexAttribPointer(v_attrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, tex);
+
 			int size;
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebuf);
 			glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
@@ -147,6 +153,7 @@ class tile_floor : public gameobject {
 			glDrawElementsInstanced(GL_TRIANGLES, size / sizeof(uint16_t), GL_UNSIGNED_SHORT, 0, 10000);
 		}
 };
+
 
 class loaded_object : public gameobject {
 	public:
@@ -488,7 +495,10 @@ class turret : public loaded_object {
 	turret() : loaded_object("", "", glm::vec3()) {}
 
 	void move() {
-		
+		/*
+		target_location = current_target.locations[0];
+		current_projectile->add_projectile(locations[0], target_location, 10000);
+		*/	
 	}
 };
 

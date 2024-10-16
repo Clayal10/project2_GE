@@ -1,7 +1,10 @@
 /*	Some Notes:
- - Replace floor with texture
+ - Replace floor with texture (DONE)
  - change shooting / get rid of burst?
- - Reorganize classes into something like base_class.cpp
+ - Reorganize classes into something like base_class.h (DONE)
+	- Could reorganize more by making base_class.cpp and putting classes in game.h or erase game.h
+ - Create proper turret class.
+ - Add a health or damage mechanism
 */
 
 
@@ -18,8 +21,8 @@
 #include<chrono>
 #include<mutex>
 #include<ctime>
+#include "stb_image.h"
 #include "scolor.hpp"
-#include "game.h"
 #include "base_class.h"
 
 #define _USE_MATH_DEFINES
@@ -338,17 +341,8 @@ int main(int argc, char** argv) {
 	objects.push_back(&fl);
 
 
-	targets.scale = 10.0f;
-	/*
-	for(int height = 30; height < 300; height+= 30){
-		targets.locations.push_back(glm::vec3(0, height, 0));
-		targets.locations.push_back(glm::vec3(30, height, 0));
-		targets.locations.push_back(glm::vec3(-30, height, 0));
-	}
-	for(int z = -40; z > -300; z += -10)
-		targets.locations.push_back(glm::vec3(10, 3, z));
-	objects.push_back(&targets);
-	*/
+	//targets.scale = 10.0f;
+
 	objects.push_back(&brick_fragments);
 
 	/*The wall
