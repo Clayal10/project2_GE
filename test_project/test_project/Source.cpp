@@ -112,7 +112,7 @@ struct key_status {
 struct key_status player_key_status;
 
 void fire(bool burst = false){
-	ice_balls.add_projectile(player_position, player_heading, player_elevation, 0.3f, 10000.0f, 1.0f, burst);
+	ice_balls.add_projectile(player_position, player_heading, player_elevation, 1.6f, 10000.0f, 1.0f, burst);
 }
 
 void mouse_click_callback(GLFWwindow* window, int button, int action, int mods){
@@ -340,8 +340,9 @@ int main(int argc, char** argv) {
 	objects.push_back(&ice_balls);
 	objects.push_back(&fl);
 
+	//already called targets above bob()
+	targets.scale = 10.0f;
 
-	//targets.scale = 10.0f;
 
 	objects.push_back(&brick_fragments);
 
@@ -357,16 +358,21 @@ int main(int argc, char** argv) {
 	*/
 
 	/*texture cube*/
-	loaded_object tex_cube("tex_cube.obj", "beans.jpg", glm::vec3(2, 2, 2));
+	loaded_object tex_cube("tex_cube.obj", "beans.jpg", glm::vec3(10, 10, 10));
 	tex_cube.locations.push_back(glm::vec3(0, 0, 0));
 	objects.push_back(&tex_cube);
 
-	/*
+	turret t;
+	t.locations.push_back(glm::vec3(100, 10, 100));
+	t.current_projectile = &ice_balls;
+	objects.push_back(&t);
+
+	
 	activation_area target_spawning;
 	target_spawning.size = glm::vec3(10, 10, 10);
 	target_spawning.add_area(glm::vec3(10, 0, 10), bob);
 	objects.push_back(&target_spawning);
-	*/
+	
 
 	/* Initialize game objects */
 	for(gameobject* o : objects){

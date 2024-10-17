@@ -309,7 +309,7 @@ public:
 	std::vector<bool> bursting;
 	std::mutex data_mutex;
 	projectile() : loaded_object("projectile.obj", "projectile.jpg", glm::vec3(0.1, 0.1, 0.1)) {
-		collision_check = false;
+		collision_check = false;//check back here ?
 	}
 	void create_burst(float quantity, glm::vec3 origin, float speed){
 		for(size_t i = 0; i < quantity; i++){
@@ -455,7 +455,7 @@ fragment brick_fragments;
 
 class target : public loaded_object {
 public:
-	target() : loaded_object("monkey.obj", "brick.jpg", glm::vec3(15.0f, 10.0f, 15.0f)) {
+	target() : loaded_object("tex_cube.obj", "beans.jpg", glm::vec3(15.0f, 10.0f, 15.0f)) {
 		collision_check = true;
 	}
 	void hit_index(long index){
@@ -489,16 +489,31 @@ class elevator : public loaded_object {
 };
 
 class turret : public loaded_object {
+public:
+	size_t target_idx = 0;
 	gameobject* current_target; //could make a list
 	projectile* current_projectile;
+	int countdown = 100;
 
-	turret() : loaded_object("", "", glm::vec3()) {}
+	turret() : loaded_object("cat.obj", "Cat_bump.jpg", glm::vec3(10, 10, 10)) {//this size isn't a big deal, just collision. Could change
+	}
 
 	void move() {
-		/*
-		target_location = current_target.locations[0];
-		current_projectile->add_projectile(locations[0], target_location, 10000);
-		*/	
+		//turret is too OP and crashes my poor laptop :(
+		if(countdown > 0){
+			countdown;//Add back the '--', this is just for testing
+			return;
+		}
+		if(!current_target->locations.size()){
+			return;
+		}
+		glm::vec3 target_location = current_target->locations[target_idx];
+		current_projectile->add_projectile(locations[0], glm::normalize(target_location - locations[0]), countdown);
+		target_idx++;
+		if(target_idx >= current_target->locations.size()){
+			target_idx = 0;
+		}
+			
 	}
 };
 
