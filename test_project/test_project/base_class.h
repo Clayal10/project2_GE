@@ -493,28 +493,46 @@ public:
 	size_t target_idx = 0;
 	gameobject* current_target; //could make a list
 	projectile* current_projectile;
-	int countdown = 100;
+	int countdown = 10000;
 
-	turret() : loaded_object("cat.obj", "Cat_bump.jpg", glm::vec3(10, 10, 10)) {//this size isn't a big deal, just collision. Could change
-	}
+	bool movement = true;//not very good name since it'll move no matter what
+
+	turret() : loaded_object("cat.obj", "Cat_bump.jpg", glm::vec3(10, 25, 30)) {//this size isn't a big deal, just collision. Could change
+	}//hit box is kind of in front of its feet
 
 	void move() {
 		//turret is too OP and crashes my poor laptop :(
 		if(countdown > 0){
-			countdown;//Add back the '--', this is just for testing
+			countdown--;//Add back the '--', this is just for testing
 			return;
 		}
 		if(!current_target->locations.size()){
 			return;
 		}
 		glm::vec3 target_location = current_target->locations[target_idx];
-		current_projectile->add_projectile(locations[0], glm::normalize(target_location - locations[0]), countdown);
+		current_projectile->add_projectile(locations[0], 0.01f*(target_location - locations[0]), countdown);
 		target_idx++;
 		if(target_idx >= current_target->locations.size()){
 			target_idx = 0;
 		}
-			
+
+		/*Movement*/
+		if (movement) {
+			locations[0].x += 1;
+			if (locations[0].x > 200)
+				movement = false;
+		}
+		else {
+			locations[0].x -= 1;
+			if (locations[0].x < -100)
+				movement = true;
+		}
+
 	}
+	void draw(glm::mat4 vp) {
+		loaded_object::draw(vp);
+	}
+	
 };
 
 #endif

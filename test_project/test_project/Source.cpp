@@ -140,11 +140,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if(GLFW_KEY_D == key)
 		player_key_status.right = action;
 	if(GLFW_KEY_SPACE == key && 1 == action){
-		//if(player_platform){ //this is for only jumping on a platform
+		if(player_platform || player_position.y == player_height){ // this only works since floor height is 0
 			player_fall_speed = 0.65f;
 			player_position.y += 1.0f;
 			player_platform = 0;
-		//}
+		}
 	}
 }
 
@@ -308,6 +308,7 @@ void bob(){
 	if(!bob_happened){
 		bob_happened = true;
 		targets.locations.push_back(glm::vec3(-10, 5, 10));
+		//could activate turret or do something else instead of this.
 	}
 };
 
@@ -341,21 +342,13 @@ int main(int argc, char** argv) {
 	objects.push_back(&fl);
 
 	//already called targets above bob()
-	targets.scale = 10.0f;
-
+	targets.scale = 1.0f;
+	for (int i = -100; i < 200; i += 20) {
+		targets.locations.push_back(glm::vec3(i, 0, -100));
+	}
+	objects.push_back(&targets);
 
 	objects.push_back(&brick_fragments);
-
-	/*The wall
-	* The current reconfigured engine is using a seperate object type for collision, this version still uses
-	* loaded object.
-	loaded_object wallblock("cube.obj", "brick.jpg", glm::vec3(2, 2, 2));
-	objects.push_back(&wallblock);
-	for(int x = 0; x < 20; x += 2)
-		for(int y = -10; y < 10; y += 2)
-			for(int z = 0; z < 4; z += 2)
-				wallblock.locations.push_back(glm::vec3(x, y, z));
-	*/
 
 	/*texture cube*/
 	loaded_object tex_cube("tex_cube.obj", "beans.jpg", glm::vec3(10, 10, 10));
@@ -363,16 +356,17 @@ int main(int argc, char** argv) {
 	objects.push_back(&tex_cube);
 
 	turret t;
-	t.locations.push_back(glm::vec3(100, 10, 100));
+	t.locations.push_back(glm::vec3(100, 30, 100));
+	t.current_target = &targets;
 	t.current_projectile = &ice_balls;
 	objects.push_back(&t);
 
-	
+	/*
 	activation_area target_spawning;
 	target_spawning.size = glm::vec3(10, 10, 10);
 	target_spawning.add_area(glm::vec3(10, 0, 10), bob);
 	objects.push_back(&target_spawning);
-	
+	*/
 
 	/* Initialize game objects */
 	for(gameobject* o : objects){
