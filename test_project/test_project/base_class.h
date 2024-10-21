@@ -2,6 +2,7 @@
 #define BASE_CLASS_H
 
 #include<stdio.h>
+#include<iostream>
 #include<stdlib.h>
 #include<fcntl.h>
 #include<GL/glew.h>
@@ -311,6 +312,8 @@ public:
 	projectile() : loaded_object("projectile.obj", "projectile.jpg", glm::vec3(0.1, 0.1, 0.1)) {
 		collision_check = false;//check back here ?
 	}
+	bool is_on_idx(glm::vec3 position, size_t index) override { return false; }
+	long is_on(glm::vec3 position) override { return -1; }
 	void create_burst(float quantity, glm::vec3 origin, float speed){
 		for(size_t i = 0; i < quantity; i++){
 			locations.push_back(origin);
@@ -490,30 +493,28 @@ class elevator : public loaded_object {
 
 class turret : public loaded_object {
 public:
-	size_t target_idx = 0;
-	gameobject* current_target; //could make a list
+	glm::vec3* player_target; //the player
 	projectile* current_projectile;
-	int countdown = 10000;
+	int countdown = 1000;
+	const static int life = 10000;
 
 	bool movement = true;//not very good name since it'll move no matter what
 
 	turret() : loaded_object("cat.obj", "Cat_bump.jpg", glm::vec3(10, 25, 30)) {//this size isn't a big deal, just collision. Could change
+		collision_check = false;
+	
 	}//hit box is kind of in front of its feet
 
 	void move() {
 		//turret is too OP and crashes my poor laptop :(
-		if(countdown > 0){
+		if(countdown > 1){
 			countdown--;//Add back the '--', this is just for testing
 			return;
 		}
-		if(!current_target->locations.size()){
-			return;
-		}
-		glm::vec3 target_location = current_target->locations[target_idx];
-		current_projectile->add_projectile(locations[0], 0.01f*(target_location - locations[0]), countdown);
-		target_idx++;
-		if(target_idx >= current_target->locations.size()){
-			target_idx = 0;
+		if (countdown > 0) {
+			current_projectile->add_projectile(locations[0], 0.01f * (*player_target - locations[0]), life);
+			
+			countdown = 5;
 		}
 
 		/*Movement*/
@@ -527,6 +528,7 @@ public:
 			if (locations[0].x < -100)
 				movement = true;
 		}
+		countdown--;
 
 	}
 	void draw(glm::mat4 vp) {

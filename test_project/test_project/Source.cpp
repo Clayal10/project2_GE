@@ -273,6 +273,7 @@ void collision_detection(){
 					if(index != -1) {
 						o->hit_index(index);
 						ice_balls.hit_index(proj_index);
+						break;
 					}
 				}
 			}
@@ -357,7 +358,7 @@ int main(int argc, char** argv) {
 
 	turret t;
 	t.locations.push_back(glm::vec3(100, 30, 100));
-	t.current_target = &targets;
+	t.player_target = &player_position;
 	t.current_projectile = &ice_balls;
 	objects.push_back(&t);
 
