@@ -505,16 +505,19 @@ public:
 	
 	}//hit box is kind of in front of its feet
 
+	/*Check if got hit: use loaded object method?*/
+
+
 	void move() {
 		//turret is too OP and crashes my poor laptop :(
 		if(countdown > 1){
 			countdown--;//Add back the '--', this is just for testing
 			return;
 		}
-		if (countdown > 0) {
+		if (countdown == 0) {
 			current_projectile->add_projectile(locations[0], 0.01f * (*player_target - locations[0]), life);
 			
-			countdown = 5;
+			countdown = 20;
 		}
 
 		/*Movement*/
@@ -528,6 +531,8 @@ public:
 			if (locations[0].x < -100)
 				movement = true;
 		}
+		
+
 		countdown--;
 
 	}
