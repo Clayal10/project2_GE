@@ -309,8 +309,12 @@ public:
 	std::vector<float> lifetimes;
 	std::vector<bool> bursting;
 	std::mutex data_mutex;
+	bool shot_no_hit = false;
 	projectile() : loaded_object("projectile.obj", "projectile.jpg", glm::vec3(0.1, 0.1, 0.1)) {
 		collision_check = false;//check back here ?
+	}
+	void dont_hit_self() {
+		shot_no_hit = true;
 	}
 	bool is_on_idx(glm::vec3 position, size_t index) override { return false; }
 	long is_on(glm::vec3 position) override { return -1; }
@@ -495,45 +499,51 @@ class turret : public loaded_object {
 public:
 	glm::vec3* player_target; //the player
 	projectile* current_projectile;
-	int countdown = 1000;
+	int countdown = 500;
 	const static int life = 10000;
-
+	int fire_freq = 0;
+	
+	bool not_shot = true;
 	bool movement = true;//not very good name since it'll move no matter what
 
 	turret() : loaded_object("cat.obj", "Cat_bump.jpg", glm::vec3(10, 25, 30)) {//this size isn't a big deal, just collision. Could change
-		collision_check = false;
+		collision_check = true;
 	
 	}//hit box is kind of in front of its feet
-
 	/*Check if got hit: use loaded object method?*/
-
-
+	void hit_index(long index) {
+		not_shot = false; // first projectile shot "hits" turret
+	}
 	void move() {
-		//turret is too OP and crashes my poor laptop :(
 		if(countdown > 1){
 			countdown--;//Add back the '--', this is just for testing
 			return;
 		}
-		if (countdown == 0) {
-			current_projectile->add_projectile(locations[0], 0.01f * (*player_target - locations[0]), life);
+		if (fire_freq == 0 && not_shot) {
+			//a weird but succesful way of making the turret not hit itself
+			current_projectile->add_projectile(locations[0] + glm::vec3(0, -25, 0), 0.01f * (*player_target - locations[0] + glm::vec3(0, 25, 0)), life);
 			
-			countdown = 20;
+			fire_freq = 100;
 		}
 
 		/*Movement*/
-		if (movement) {
+		if (movement && not_shot) {
 			locations[0].x += 1;
 			if (locations[0].x > 200)
 				movement = false;
 		}
-		else {
+		else if(!movement && not_shot){
 			locations[0].x -= 1;
 			if (locations[0].x < -100)
 				movement = true;
 		}
+
+		if (!not_shot && locations[0].y > -100) {
+			locations[0].y -= 1;
+		}
 		
 
-		countdown--;
+		fire_freq--;
 
 	}
 	void draw(glm::mat4 vp) {
