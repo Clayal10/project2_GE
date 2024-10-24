@@ -167,16 +167,16 @@ void player_movement(){
 		auto start = std::chrono::system_clock::now();
 		glm::vec3 step_to_point = player_position;
 		if(player_key_status.forward){
-			step_to_point += 0.6f * glm::vec3(sinf(player_heading), 0, cosf(player_heading));
+			step_to_point += player_speed * glm::vec3(sinf(player_heading), 0, cosf(player_heading));
 		}
 		if(player_key_status.backward){
-			step_to_point += 0.4f * glm::vec3(-sinf(player_heading), 0, -cosf(player_heading));
+			step_to_point += player_speed * glm::vec3(-sinf(player_heading), 0, -cosf(player_heading));
 		}
 		if(player_key_status.left){
-			step_to_point += 0.6f * glm::vec3(sinf(player_heading + M_PI/2), 0, cosf(player_heading + M_PI/2));
+			step_to_point += player_speed * glm::vec3(sinf(player_heading + M_PI/2), 0, cosf(player_heading + M_PI/2));
 		}
 		if(player_key_status.right){
-			step_to_point += 0.4f * glm::vec3(-sinf(player_heading + M_PI/2), 0, -cosf(player_heading + M_PI/2));
+			step_to_point += player_speed * glm::vec3(-sinf(player_heading + M_PI/2), 0, -cosf(player_heading + M_PI/2));
 		}
                 for(gameobject* o : objects) {
                         long collide_index = o->collision_index(step_to_point, 0.2f);
@@ -349,7 +349,7 @@ int main(int argc, char** argv) {
 	}
 	objects.push_back(&targets);
 
-	objects.push_back(&brick_fragments);
+	//objects.push_back(&brick_fragments);
 
 	/*texture cube*/
 	loaded_object tex_cube("tex_cube.obj", "beans.jpg", glm::vec3(10, 10, 10));

@@ -43,6 +43,7 @@ float player_heading;
 float player_height = 2;
 float player_elevation;
 float player_fall_speed = 0;
+float player_speed = .6f;
 gameobject* player_platform = 0;
 size_t player_platform_index = 0;
 
@@ -331,7 +332,7 @@ public:
 		data_mutex.lock();
 		for(int i = 0; i < locations.size(); i++){
 			if(bursting[i])
-				directions[i].y -= 0.0002;
+				directions[i].y -= 0.02;
 			locations[i] += directions[i];
 			lifetimes[i] -= time_resolution; // TODO:  Manage time resolutions better
 			if(lifetimes[i] <= 0.0f) {
@@ -514,6 +515,13 @@ public:
 	void hit_index(long index) {
 		not_shot = false; // first projectile shot "hits" turret
 	}
+
+	bool hit_player(){
+		if (current_projectile->locations[0] == player_position) {
+			
+		}
+	}
+
 	void move() {
 		if(countdown > 1){
 			countdown--;//Add back the '--', this is just for testing
@@ -541,9 +549,26 @@ public:
 		if (!not_shot && locations[0].y > -100) {
 			locations[0].y -= 1;
 		}
-		
 
 		fire_freq--;
+
+		/*Check if hit player*/
+		//is messing around with globals in here a bad idea?
+		if (current_projectile->locations[0].x > player_position.x-5 && current_projectile->locations[0].x < player_position.x+5
+			&& current_projectile->locations[0].z > player_position.z - 5 && current_projectile->locations[0].z < player_position.z + 5
+			&& current_projectile->locations[0].y > player_position.y - 5 && current_projectile->locations[0].y < player_position.y + 5) {
+			if (player_speed == 0)
+				return;// could do something cooler here
+			
+			player_speed -= .1f;
+			player_position.y = -100;
+
+			printf("Hit player: current speed is %f\n", player_speed);
+			current_projectile->locations[0] += glm::vec3(0, -100, 0);
+
+		}
+
+		
 
 	}
 	void draw(glm::mat4 vp) {
