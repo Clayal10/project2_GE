@@ -353,7 +353,7 @@ int main(int argc, char** argv) {
 
 	/*texture cube*/
 	loaded_object tex_cube("tex_cube.obj", "beans.jpg", glm::vec3(10, 10, 10));
-	tex_cube.locations.push_back(glm::vec3(0, 0, 0));
+	tex_cube.locations.push_back(glm::vec3(0, 0, -100));
 	objects.push_back(&tex_cube);
 
 	turret t;
@@ -362,12 +362,6 @@ int main(int argc, char** argv) {
 	t.current_projectile = &ice_balls;
 	objects.push_back(&t);
 
-	/*
-	activation_area target_spawning;
-	target_spawning.size = glm::vec3(10, 10, 10);
-	target_spawning.add_area(glm::vec3(10, 0, 10), bob);
-	objects.push_back(&target_spawning);
-	*/
 
 	/* Initialize game objects */
 	for(gameobject* o : objects){

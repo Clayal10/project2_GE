@@ -44,6 +44,7 @@ float player_height = 2;
 float player_elevation;
 float player_fall_speed = 0;
 float player_speed = .6f;
+bool player_dead = false;
 gameobject* player_platform = 0;
 size_t player_platform_index = 0;
 
@@ -503,7 +504,9 @@ public:
 	int countdown = 500;
 	const static int life = 10000;
 	int fire_freq = 0;
+	int p; //used to see which is the most recent for indexing for projectiles
 	
+	bool can_shoot = true;
 	bool not_shot = true;
 	bool movement = true;//not very good name since it'll move no matter what
 
@@ -516,12 +519,8 @@ public:
 		not_shot = false; // first projectile shot "hits" turret
 	}
 
-	bool hit_player(){
-		if (current_projectile->locations[0] == player_position) {
-			
-		}
-	}
-
+	int count = 0;
+	int count_down_count = 60; //i kinda hate these names
 	void move() {
 		if(countdown > 1){
 			countdown--;//Add back the '--', this is just for testing
@@ -530,8 +529,9 @@ public:
 		if (fire_freq == 0 && not_shot) {
 			//a weird but succesful way of making the turret not hit itself
 			current_projectile->add_projectile(locations[0] + glm::vec3(0, -25, 0), 0.01f * (*player_target - locations[0] + glm::vec3(0, 25, 0)), life);
-			
-			fire_freq = 100;
+			//printf("%d\n", current_projectile->locations.size());
+
+			fire_freq = count_down_count;
 		}
 
 		/*Movement*/
@@ -554,21 +554,37 @@ public:
 
 		/*Check if hit player*/
 		//is messing around with globals in here a bad idea?
-		if (current_projectile->locations[0].x > player_position.x-5 && current_projectile->locations[0].x < player_position.x+5
-			&& current_projectile->locations[0].z > player_position.z - 5 && current_projectile->locations[0].z < player_position.z + 5
-			&& current_projectile->locations[0].y > player_position.y - 5 && current_projectile->locations[0].y < player_position.y + 5) {
-			if (player_speed == 0)
-				return;// could do something cooler here
-			
-			player_speed -= .1f;
-			player_position.y = -100;
-
-			printf("Hit player: current speed is %f\n", player_speed);
-			current_projectile->locations[0] += glm::vec3(0, -100, 0);
-
+		p = current_projectile->locations.size() - 1;
+		for (int i = 0; i < p; i++) {// should check if any of them hit the player
+			if (current_projectile->locations[i].x > player_position.x - 5 && current_projectile->locations[i].x < player_position.x + 5
+				&& current_projectile->locations[i].z > player_position.z - 5 && current_projectile->locations[i].z < player_position.z + 5
+				&& current_projectile->locations[i].y > player_position.y - 5 && current_projectile->locations[i].y < player_position.y + 5) {
+				if (player_speed <= 0.1f)
+					player_dead = true;// could do something cooler here
+				if (!player_dead) {
+					player_speed -= 0.1f;
+					printf("Current player speed : % f\n", player_speed);
+				}
+				puts("Player Hit!");
+				current_projectile->remove_projectile(i);
+				break;
+			}
+		}
+		if (player_dead) {
+			not_shot = false; // not nessesarily shot, but don't want it to shoot
+			locations[0] = player_position + glm::vec3(0, 40, -20);
 		}
 
-		
+		//some weird stuff to make turret gradually speed up shooting
+		if (count == 100) {
+			count = 0;
+			count_down_count -= 1;
+			//this will eventually go down to 0, which will prevent it from shooting
+			//keep for now, cool feature!!
+		}
+		else
+			count++;
+
 
 	}
 	void draw(glm::mat4 vp) {
