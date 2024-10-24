@@ -1,7 +1,10 @@
 /*	Some Notes:
- - Replace floor with texture
+ - Replace floor with texture (DONE)
  - change shooting / get rid of burst?
- - Reorganize classes into something like base_class.cpp
+ - Reorganize classes into something like base_class.h (DONE)
+	- Could reorganize more by making base_class.cpp and putting classes in game.h or erase game.h
+ - Create proper turret class.
+ - Add a health or damage mechanism
 */
 
 
@@ -18,8 +21,8 @@
 #include<chrono>
 #include<mutex>
 #include<ctime>
+#include "stb_image.h"
 #include "scolor.hpp"
-#include "game.h"
 #include "base_class.h"
 
 #define _USE_MATH_DEFINES
@@ -27,10 +30,6 @@
 #define M_PI 3.14159265f
 
 std::mutex grand_mutex;
-
-
-
-	
 
 GLuint make_shader(const char* filename, GLenum shaderType) {
 	FILE* fd = fopen(filename, "r");
@@ -113,7 +112,7 @@ struct key_status {
 struct key_status player_key_status;
 
 void fire(bool burst = false){
-	ice_balls.add_projectile(player_position, player_heading, player_elevation, 0.3f, 10000.0f, 1.0f, burst);
+	ice_balls.add_projectile(player_position, player_heading, player_elevation, 1.6f, 10000.0f, 1.0f, burst);
 }
 
 void mouse_click_callback(GLFWwindow* window, int button, int action, int mods){
@@ -141,11 +140,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if(GLFW_KEY_D == key)
 		player_key_status.right = action;
 	if(GLFW_KEY_SPACE == key && 1 == action){
-		//if(player_platform){ //this is for only jumping on a platform
+		if(player_platform || player_position.y == player_height){ // this only works since floor height is 0
 			player_fall_speed = 0.65f;
 			player_position.y += 1.0f;
 			player_platform = 0;
-		//}
+		}
 	}
 }
 
@@ -168,16 +167,16 @@ void player_movement(){
 		auto start = std::chrono::system_clock::now();
 		glm::vec3 step_to_point = player_position;
 		if(player_key_status.forward){
-			step_to_point += 0.6f * glm::vec3(sinf(player_heading), 0, cosf(player_heading));
+			step_to_point += player_speed * glm::vec3(sinf(player_heading), 0, cosf(player_heading));
 		}
 		if(player_key_status.backward){
-			step_to_point += 0.4f * glm::vec3(-sinf(player_heading), 0, -cosf(player_heading));
+			step_to_point += player_speed * glm::vec3(-sinf(player_heading), 0, -cosf(player_heading));
 		}
 		if(player_key_status.left){
-			step_to_point += 0.6f * glm::vec3(sinf(player_heading + M_PI/2), 0, cosf(player_heading + M_PI/2));
+			step_to_point += player_speed * glm::vec3(sinf(player_heading + M_PI/2), 0, cosf(player_heading + M_PI/2));
 		}
 		if(player_key_status.right){
-			step_to_point += 0.4f * glm::vec3(-sinf(player_heading + M_PI/2), 0, -cosf(player_heading + M_PI/2));
+			step_to_point += player_speed * glm::vec3(-sinf(player_heading + M_PI/2), 0, -cosf(player_heading + M_PI/2));
 		}
                 for(gameobject* o : objects) {
                         long collide_index = o->collision_index(step_to_point, 0.2f);
@@ -274,6 +273,7 @@ void collision_detection(){
 					if(index != -1) {
 						o->hit_index(index);
 						ice_balls.hit_index(proj_index);
+						break;
 					}
 				}
 			}
@@ -309,6 +309,7 @@ void bob(){
 	if(!bob_happened){
 		bob_happened = true;
 		targets.locations.push_back(glm::vec3(-10, 5, 10));
+		//could activate turret or do something else instead of this.
 	}
 };
 
@@ -341,40 +342,26 @@ int main(int argc, char** argv) {
 	objects.push_back(&ice_balls);
 	objects.push_back(&fl);
 
-
-	targets.scale = 10.0f;
-	/*
-	for(int height = 30; height < 300; height+= 30){
-		targets.locations.push_back(glm::vec3(0, height, 0));
-		targets.locations.push_back(glm::vec3(30, height, 0));
-		targets.locations.push_back(glm::vec3(-30, height, 0));
+	//already called targets above bob()
+	targets.scale = 1.0f;
+	for (int i = -100; i < 200; i += 20) {
+		targets.locations.push_back(glm::vec3(i, 0, -100));
 	}
-	for(int z = -40; z > -300; z += -10)
-		targets.locations.push_back(glm::vec3(10, 3, z));
 	objects.push_back(&targets);
-	*/
-	objects.push_back(&brick_fragments);
 
-	/*The wall
-	* The current reconfigured engine is using a seperate object type for collision, this version still uses
-	* loaded object.
-	loaded_object wallblock("cube.obj", "brick.jpg", glm::vec3(2, 2, 2));
-	objects.push_back(&wallblock);
-	for(int x = 0; x < 20; x += 2)
-		for(int y = -10; y < 10; y += 2)
-			for(int z = 0; z < 4; z += 2)
-				wallblock.locations.push_back(glm::vec3(x, y, z));
-	*/
+	//objects.push_back(&brick_fragments);
 
 	/*texture cube*/
-	loaded_object tex_cube("tex_cube.obj", "beans.jpg", glm::vec3(2, 2, 2));
-	tex_cube.locations.push_back(glm::vec3(0, 0, 0));
+	loaded_object tex_cube("tex_cube.obj", "beans.jpg", glm::vec3(10, 10, 10));
+	tex_cube.locations.push_back(glm::vec3(0, 0, -100));
 	objects.push_back(&tex_cube);
 
-	activation_area target_spawning;
-	target_spawning.size = glm::vec3(10, 10, 10);
-	target_spawning.add_area(glm::vec3(10, 0, 10), bob);
-	objects.push_back(&target_spawning);
+	turret t;
+	t.locations.push_back(glm::vec3(100, 30, 100));
+	t.player_target = &player_position;
+	t.current_projectile = &ice_balls;
+	objects.push_back(&t);
+
 
 	/* Initialize game objects */
 	for(gameobject* o : objects){

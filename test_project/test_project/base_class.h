@@ -2,6 +2,7 @@
 #define BASE_CLASS_H
 
 #include<stdio.h>
+#include<iostream>
 #include<stdlib.h>
 #include<fcntl.h>
 #include<GL/glew.h>
@@ -14,6 +15,7 @@
 #include<chrono>
 #include<mutex>
 #include<ctime>
+
 #include "scolor.hpp"
 #include "game.h"
 
@@ -41,6 +43,8 @@ float player_heading;
 float player_height = 2;
 float player_elevation;
 float player_fall_speed = 0;
+float player_speed = .6f;
+bool player_dead = false;
 gameobject* player_platform = 0;
 size_t player_platform_index = 0;
 
@@ -101,7 +105,7 @@ class activation_area : public gameobject {
 
 class tile_floor : public gameobject {
 	public:
-		unsigned int mvp_uniform, anim_uniform, v_attrib, c_attrib, program, vbuf, cbuf, ebuf;
+		unsigned int mvp_uniform, anim_uniform, v_attrib, c_attrib, program, vbuf, cbuf, ebuf, tex;
 		int init() override {
 			// Initialization part
 			float vertices[] = {
@@ -122,12 +126,14 @@ class tile_floor : public gameobject {
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebuf);
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(floor_elements), floor_elements, GL_STATIC_DRAW);
 
+			tex = load_texture("stone_floor.jpg");
+
 			program = make_program("floor_vertex_shader.glsl",0, 0, 0, "floor_fragment_shader.glsl");
 			if (!program)
 				return 1;
 
 			v_attrib = glGetAttribLocation(program, "in_vertex");
-			c_attrib = glGetAttribLocation(program, "in_color");
+			//c_attrib = glGetAttribLocation(program, "in_color");
 			mvp_uniform = glGetUniformLocation(program, "mvp");
 			return 0;
 		}
@@ -138,6 +144,9 @@ class tile_floor : public gameobject {
 			glBindBuffer(GL_ARRAY_BUFFER, vbuf);
 			glVertexAttribPointer(v_attrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, tex);
+
 			int size;
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebuf);
 			glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
@@ -147,6 +156,7 @@ class tile_floor : public gameobject {
 			glDrawElementsInstanced(GL_TRIANGLES, size / sizeof(uint16_t), GL_UNSIGNED_SHORT, 0, 10000);
 		}
 };
+
 
 class loaded_object : public gameobject {
 	public:
@@ -301,9 +311,15 @@ public:
 	std::vector<float> lifetimes;
 	std::vector<bool> bursting;
 	std::mutex data_mutex;
+	bool shot_no_hit = false;
 	projectile() : loaded_object("projectile.obj", "projectile.jpg", glm::vec3(0.1, 0.1, 0.1)) {
-		collision_check = false;
+		collision_check = false;//check back here ?
 	}
+	void dont_hit_self() {
+		shot_no_hit = true;
+	}
+	bool is_on_idx(glm::vec3 position, size_t index) override { return false; }
+	long is_on(glm::vec3 position) override { return -1; }
 	void create_burst(float quantity, glm::vec3 origin, float speed){
 		for(size_t i = 0; i < quantity; i++){
 			locations.push_back(origin);
@@ -317,7 +333,7 @@ public:
 		data_mutex.lock();
 		for(int i = 0; i < locations.size(); i++){
 			if(bursting[i])
-				directions[i].y -= 0.0002;
+				directions[i].y -= 0.02;
 			locations[i] += directions[i];
 			lifetimes[i] -= time_resolution; // TODO:  Manage time resolutions better
 			if(lifetimes[i] <= 0.0f) {
@@ -448,7 +464,7 @@ fragment brick_fragments;
 
 class target : public loaded_object {
 public:
-	target() : loaded_object("monkey.obj", "brick.jpg", glm::vec3(15.0f, 10.0f, 15.0f)) {
+	target() : loaded_object("tex_cube.obj", "beans.jpg", glm::vec3(15.0f, 10.0f, 15.0f)) {
 		collision_check = true;
 	}
 	void hit_index(long index){
@@ -479,6 +495,102 @@ class elevator : public loaded_object {
 		void draw(glm::mat4 vp){
 			loaded_object::draw(vp);
 		}
+};
+
+class turret : public loaded_object {
+public:
+	glm::vec3* player_target; //the player
+	projectile* current_projectile;
+	int countdown = 500;
+	const static int life = 10000;
+	int fire_freq = 0;
+	int p; //used to see which is the most recent for indexing for projectiles
+	
+	bool can_shoot = true;
+	bool not_shot = true;
+	bool movement = true;//not very good name since it'll move no matter what
+
+	turret() : loaded_object("cat.obj", "Cat_bump.jpg", glm::vec3(10, 25, 30)) {//this size isn't a big deal, just collision. Could change
+		collision_check = true;
+	
+	}//hit box is kind of in front of its feet
+	/*Check if got hit: use loaded object method?*/
+	void hit_index(long index) {
+		not_shot = false; // first projectile shot "hits" turret
+	}
+
+	int count = 0;
+	int count_down_count = 60; //i kinda hate these names
+	void move() {
+		if(countdown > 1){
+			countdown--;//Add back the '--', this is just for testing
+			return;
+		}
+		if (fire_freq == 0 && not_shot) {
+			//a weird but succesful way of making the turret not hit itself
+			current_projectile->add_projectile(locations[0] + glm::vec3(0, -25, 0), 0.01f * (*player_target - locations[0] + glm::vec3(0, 25, 0)), life);
+			//printf("%d\n", current_projectile->locations.size());
+
+			fire_freq = count_down_count;
+		}
+
+		/*Movement*/
+		if (movement && not_shot) {
+			locations[0].x += 1;
+			if (locations[0].x > 200)
+				movement = false;
+		}
+		else if(!movement && not_shot){
+			locations[0].x -= 1;
+			if (locations[0].x < -100)
+				movement = true;
+		}
+
+		if (!not_shot && locations[0].y > -100) {
+			locations[0].y -= 1;
+		}
+
+		fire_freq--;
+
+		/*Check if hit player*/
+		//is messing around with globals in here a bad idea?
+		p = current_projectile->locations.size() - 1;
+		for (int i = 0; i < p; i++) {// should check if any of them hit the player
+			if (current_projectile->locations[i].x > player_position.x - 5 && current_projectile->locations[i].x < player_position.x + 5
+				&& current_projectile->locations[i].z > player_position.z - 5 && current_projectile->locations[i].z < player_position.z + 5
+				&& current_projectile->locations[i].y > player_position.y - 5 && current_projectile->locations[i].y < player_position.y + 5) {
+				if (player_speed <= 0.1f)
+					player_dead = true;// could do something cooler here
+				if (!player_dead) {
+					player_speed -= 0.1f;
+					printf("Current player speed : % f\n", player_speed);
+				}
+				puts("Player Hit!");
+				current_projectile->remove_projectile(i);
+				break;
+			}
+		}
+		if (player_dead) {
+			not_shot = false; // not nessesarily shot, but don't want it to shoot
+			locations[0] = player_position + glm::vec3(0, 40, -20);
+		}
+
+		//some weird stuff to make turret gradually speed up shooting
+		if (count == 100) {
+			count = 0;
+			count_down_count -= 1;
+			//this will eventually go down to 0, which will prevent it from shooting
+			//keep for now, cool feature!!
+		}
+		else
+			count++;
+
+
+	}
+	void draw(glm::mat4 vp) {
+		loaded_object::draw(vp);
+	}
+	
 };
 
 #endif
